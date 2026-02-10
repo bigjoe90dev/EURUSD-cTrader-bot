@@ -142,6 +142,11 @@ class LondonOpenBreakoutConfig:
     rr: float = 2.0
     min_range_pips: float = 8.0
     max_range_pips: float = 40.0
+    max_spread_pips: float = 2.5
+    min_atr_pips: float = 0.5
+    max_atr_pips: float = 6.0
+    min_body_ratio: float = 0.50
+    one_trade_per_day: bool = True
 
 
 class LondonOpenBreakoutStrategy(Strategy):
@@ -154,6 +159,7 @@ class LondonOpenBreakoutStrategy(Strategy):
         self.side = None
         self.entry = None
         self.risk_pips = None
+        self.traded_today = False
 
     def name(self) -> str:
         return "london_open_breakout"
@@ -172,6 +178,7 @@ class LondonOpenBreakoutStrategy(Strategy):
         self.side = None
         self.entry = None
         self.risk_pips = None
+        self.traded_today = False
 
     def on_bar(self, bar: Bar, ctx: Context) -> str:
         local = to_london(bar.ts)
@@ -183,6 +190,7 @@ class LondonOpenBreakoutStrategy(Strategy):
             self.side = None
             self.entry = None
             self.risk_pips = None
+            self.traded_today = False
 
         # Build range
         if in_window(bar.ts, self.cfg.range_start, self.cfg.range_end):
@@ -224,17 +232,33 @@ class LondonOpenBreakoutStrategy(Strategy):
 
         if not self.range_ready or self.side:
             return Signal.FLAT
+        if self.cfg.one_trade_per_day and self.traded_today:
+            return Signal.FLAT
         if not in_window(bar.ts, self.cfg.trade_start, self.cfg.trade_end):
+            return Signal.FLAT
+        if ctx.spread_pips > self.cfg.max_spread_pips:
+            return Signal.FLAT
+        if not (self.cfg.min_atr_pips <= ctx.atr_pips <= self.cfg.max_atr_pips):
             return Signal.FLAT
 
         buffer = self.cfg.buffer_pips * 0.0001
+        bar_range = max(bar.mid_h - bar.mid_l, 1e-9)
+        body = abs(bar.mid_c - bar.mid_o)
+        body_ratio = body / bar_range
+
         if bar.mid_c > (self.range_high + buffer):
+            if body_ratio < self.cfg.min_body_ratio:
+                return Signal.FLAT
             self.side = "LONG"
             self.entry = bar.mid_c
+            self.traded_today = True
             return Signal.BUY
         if bar.mid_c < (self.range_low - buffer):
+            if body_ratio < self.cfg.min_body_ratio:
+                return Signal.FLAT
             self.side = "SHORT"
             self.entry = bar.mid_c
+            self.traded_today = True
             return Signal.SELL
         return Signal.FLAT
 
