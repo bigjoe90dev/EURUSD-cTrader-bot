@@ -29,6 +29,9 @@ class Bar:
     mid_c: float
     spread_o_pips: float
     spread_c_pips: float
+    spread_min_pips: float = 0.0
+    spread_mean_pips: float = 0.0
+    spread_max_pips: float = 0.0
     session: str = "Off"
 
 

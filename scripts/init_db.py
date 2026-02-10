@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS candles_m1 (
     mid_c           REAL,
     spread_o_pips   REAL,
     spread_c_pips   REAL,
+    spread_mean_pips REAL,
+    spread_min_pips  REAL,
+    spread_max_pips  REAL,
     session         TEXT
 );
 
@@ -101,6 +104,9 @@ CREATE TABLE IF NOT EXISTS candles_m5 (
     mid_c           REAL,
     spread_o_pips   REAL,
     spread_c_pips   REAL,
+    spread_mean_pips REAL,
+    spread_min_pips  REAL,
+    spread_max_pips  REAL,
     session         TEXT
 );
 
@@ -123,6 +129,9 @@ CREATE TABLE IF NOT EXISTS candles_m15 (
     mid_c           REAL,
     spread_o_pips   REAL,
     spread_c_pips   REAL,
+    spread_mean_pips REAL,
+    spread_min_pips  REAL,
+    spread_max_pips  REAL,
     session         TEXT
 );
 
@@ -145,6 +154,9 @@ CREATE TABLE IF NOT EXISTS candles_h1 (
     mid_c           REAL,
     spread_o_pips   REAL,
     spread_c_pips   REAL,
+    spread_mean_pips REAL,
+    spread_min_pips  REAL,
+    spread_max_pips  REAL,
     session         TEXT
 );
 

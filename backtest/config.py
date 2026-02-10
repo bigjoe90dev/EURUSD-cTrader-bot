@@ -37,7 +37,7 @@ def load_backtest_settings() -> BacktestSettings:
         session_rules=_get_env("BACKTEST_SESSION_RULES", ""),
         spread_model=_get_env("BACKTEST_SPREAD_MODEL", "empirical"),
         slippage_model=_get_env("BACKTEST_SLIPPAGE_MODEL", "session_volatility"),
-        signal_timing=_get_env("BACKTEST_SIGNAL_TIMING", "close_plus_1bar"),
+        signal_timing=_get_env("BACKTEST_SIGNAL_TIMING", "open"),
         spread_outlier_mult=float(_get_env("BACKTEST_SPREAD_OUTLIER_MULT", "10.0")),
         max_spread_pips_abs=float(_get_env("BACKTEST_MAX_SPREAD_PIPS", "20.0")),
         min_spread_pips_abs=float(_get_env("BACKTEST_MIN_SPREAD_PIPS", "0.01")),

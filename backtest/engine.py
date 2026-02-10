@@ -151,7 +151,7 @@ class BacktestEngine:
                  size_lots: float = 0.1,
                  symbol: str = "EURUSD",
                  atr_lookback: int = 14,
-                 signal_timing: str = "close_plus_1bar",
+                 signal_timing: str = "open",
                  spread_model: str = "empirical",
                  slippage_model: str = "session_volatility"):
         self.strategy = strategy
@@ -202,10 +202,10 @@ class BacktestEngine:
         for i in range(n):
             row = data.iloc[i]
             bar = self._row_to_bar(row)
-            recent_mids.append(bar.mid_c)
             atr_pips = self._estimate_atr_pips(recent_mids)
+            spread_for_ctx = bar.spread_max_pips if bar.spread_max_pips > 0 else bar.spread_c_pips
             ctx = Context(atr_pips=atr_pips, session=bar.session,
-                          spread_pips=bar.spread_c_pips, bar_index=i)
+                          spread_pips=spread_for_ctx, bar_index=i)
 
             # Execute any pending signal at open (close_plus_1bar)
             if self.signal_timing == "close_plus_1bar" and pending_signal:
@@ -245,6 +245,8 @@ class BacktestEngine:
             else:
                 equity[i] = balance
 
+            recent_mids.append(bar.mid_c)
+
             prev_bar = bar
             prev_ctx = ctx
 
@@ -253,8 +255,9 @@ class BacktestEngine:
             row = data.iloc[-1]
             bar = self._row_to_bar(row)
             atr_pips = self._estimate_atr_pips(recent_mids)
+            spread_for_ctx = bar.spread_max_pips if bar.spread_max_pips > 0 else bar.spread_c_pips
             ctx = Context(atr_pips=atr_pips, session=bar.session,
-                          spread_pips=bar.spread_c_pips, bar_index=n - 1)
+                          spread_pips=spread_for_ctx, bar_index=n - 1)
             position, balance = self._apply_signal(
                 Signal.CLOSE, position, balance, bar, ctx, price_point="close", trades=trades, totals=total_costs
             )
@@ -307,8 +310,18 @@ class BacktestEngine:
             mid_c=float(row["mid_c"]),
             spread_o_pips=float(row["spread_o_pips"]),
             spread_c_pips=float(row["spread_c_pips"]),
+            spread_min_pips=float(row.get("spread_min_pips", 0.0)),
+            spread_mean_pips=float(row.get("spread_mean_pips", 0.0)),
+            spread_max_pips=float(row.get("spread_max_pips", 0.0)),
             session=str(row.get("session", "Off")),
         )
+
+    def _select_spread_pips(self, bar: Bar, price_point: str) -> float:
+        if bar.spread_max_pips > 0:
+            return bar.spread_max_pips
+        if price_point == "open":
+            return bar.spread_o_pips
+        return bar.spread_c_pips
 
     def _effective_bid_ask(self, mid: float, spread_pips: float, session: str):
         if self.spread_model == "fixed":
@@ -341,10 +354,9 @@ class BacktestEngine:
         # Determine effective bid/ask at this price point
         if price_point == "open":
             mid = bar.mid_o
-            spread_pips = bar.spread_o_pips
         else:
             mid = bar.mid_c
-            spread_pips = bar.spread_c_pips
+        spread_pips = self._select_spread_pips(bar, price_point)
 
         eff_bid, eff_ask, eff_spread = self._effective_bid_ask(mid, spread_pips, ctx.session)
         slip_pips = self._slippage_pips(ctx.atr_pips, ctx.session)
@@ -447,7 +459,8 @@ class BacktestEngine:
         )
 
     def _mark_to_market(self, pos: Position, bar: Bar, ctx: Context) -> float:
-        eff_bid, eff_ask, _ = self._effective_bid_ask(bar.mid_c, bar.spread_c_pips, ctx.session)
+        spread_pips = bar.spread_mean_pips if bar.spread_mean_pips > 0 else bar.spread_c_pips
+        eff_bid, eff_ask, _ = self._effective_bid_ask(bar.mid_c, spread_pips, ctx.session)
         if pos.side == "LONG":
             price_diff = eff_bid - pos.entry_price
         else:

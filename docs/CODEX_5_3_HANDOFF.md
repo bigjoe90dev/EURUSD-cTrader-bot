@@ -9,7 +9,8 @@
 ## 1) End‑to‑End Summary (Plain English)
 
 We collect EURUSD ticks from cTrader into SQLite, build cleaned candle tables, and run backtests against those candles.  
-Right now all strategies are losing **except** London Open Breakout, which is now slightly profitable after filters were added.  
+We have now **tightened realism** (worse spreads, no lookahead) which made results tougher.  
+Right now all strategies are losing and **London Open Breakout is closest to breakeven**.  
 Next step is to **tune London Open Breakout** and then run the **full robust backtest suite** (walk‑forward, Monte Carlo, regimes).
 
 **Important constraint:** We are **not doing HFT**. This system is built for **free infrastructure**, so all logic must survive higher spreads, slippage, and slower execution.
@@ -81,8 +82,12 @@ Files:
 6. **Adjusted data cleaning**:
    - Drop impossible price ticks
    - Keep real spread spikes (only drop extreme/broken spreads)
-7. **Backtest signal timing default set to `open`**
-8. **Verified data exists**:
+7. **Improved candle construction**:
+   - Mid OHLC now built from mid ticks (no fake highs/lows)
+   - Spread stats stored per bar (min/mean/max) for more realistic fills
+8. **ATR now computed without current bar contamination** (reduces lookahead bias)
+9. **Backtest signal timing default set to `open`**
+10. **Verified data exists**:
    - `quotes` ~375k rows
    - Candle tables now built successfully
 9. **Ran fast backtests** and wrote results to:
@@ -104,12 +109,12 @@ Files:
 ### Fast Backtest Results (Latest)
 File: `/tmp/eurusd_fast_backtests.csv`
 
-- London Open Breakout **now slightly profitable**
-  - `cagr=0.000983` (~0.10%)
-  - `profit_factor=1.021`
-  - `max_drawdown=1.9%`
-  - trades: 159
-- Other four strategies still negative.
+These worsened after realism upgrades (spread max + no lookahead):
+- London Open Breakout: `cagr=-0.000254`, `profit_factor=0.995`, `max_drawdown=1.96%`, trades 159  
+- Asian Range Fade: `cagr=-0.186790`, `profit_factor=0.240`, `max_drawdown=32.87%`, trades 1549  
+- MA Cross + ADX: `cagr=-0.042967`, `profit_factor=0.607`, `max_drawdown=8.18%`, trades 405  
+- Bollinger Bounce: `cagr=-0.071506`, `profit_factor=0.646`, `max_drawdown=13.64%`, trades 995  
+- RSI Divergence: `cagr=-0.031494`, `profit_factor=0.717`, `max_drawdown=7.03%`, trades 457
 
 ---
 
@@ -118,18 +123,20 @@ File: `/tmp/eurusd_fast_backtests.csv`
 **Main confusion:** backtests were “not working” because candle tables were empty.  
 This is now fixed. Backtests run and produce output.
 
-**LLM review status:** Only Grok review text was present in `LLM_reviews/v1/grok/review 1` at last check.  
-Other review files were empty.
+**LLM review status:** GPT, Gemini, Grok, and DeepSeek reviews are now populated in `LLM_reviews/v1/*/review 1`.  
+DeepSeek includes some generic snippets; verify any claims against repo before changes.
 
 ---
 
 ## 6) Where We’re Headed (Next Steps)
 
-1. **Tune London Open Breakout** properly
-   - Search buffer, ATR bounds, body ratio
+1. **Tune London Open Breakout** against realistic costs
+   - Re‑optimize buffer, ATR bounds, body ratio, and exit timing
 2. **Run full robustness backtests**
    - Walk‑forward, Monte Carlo, regime analysis
-3. Decide:
+3. **Add stronger risk controls** in backtests
+   - Daily loss cap, max trades/day, and lot sizing via `backtest/position_sizer.py`
+4. Decide:
    - If London Open Breakout survives robust tests → proceed to paper trading
    - If it fails → redesign strategy
 

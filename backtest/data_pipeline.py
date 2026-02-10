@@ -65,37 +65,37 @@ def build_candles(df_ticks: pd.DataFrame,
         return df_ticks.copy()
 
     df = df_ticks.copy()
+    if "mid" not in df.columns:
+        df["mid"] = (df["bid"] + df["ask"]) / 2.0
+    if "spread_pips" not in df.columns:
+        df["spread_pips"] = (df["ask"] - df["bid"]) / pip_size
     df = df.set_index("ts_utc")
-
-    def _mode_or_first(x):
-        if x is None or len(x) == 0:
-            return None
-        m = x.mode()
-        if not m.empty:
-            return m.iloc[0]
-        return x.iloc[0]
 
     agg = {
         "bid": ["first", "max", "min", "last"],
         "ask": ["first", "max", "min", "last"],
-        "session": _mode_or_first,
+        "mid": ["first", "max", "min", "last"],
+        "spread_pips": ["first", "last", "mean", "min", "max"],
+        "session": "first",
     }
     res = df.resample(timeframe, label="left", closed="left").agg(agg)
     res.columns = [
         "bid_o", "bid_h", "bid_l", "bid_c",
         "ask_o", "ask_h", "ask_l", "ask_c",
+        "mid_o", "mid_h", "mid_l", "mid_c",
+        "spread_o_pips", "spread_c_pips", "spread_mean_pips", "spread_min_pips", "spread_max_pips",
         "session",
     ]
     res = res.dropna(subset=["bid_o", "ask_o", "bid_c", "ask_c"]).reset_index()
     if res.empty:
         return res
 
-    res["mid_o"] = (res["bid_o"] + res["ask_o"]) / 2.0
-    res["mid_h"] = (res["bid_h"] + res["ask_h"]) / 2.0
-    res["mid_l"] = (res["bid_l"] + res["ask_l"]) / 2.0
-    res["mid_c"] = (res["bid_c"] + res["ask_c"]) / 2.0
-    res["spread_o_pips"] = (res["ask_o"] - res["bid_o"]) / pip_size
-    res["spread_c_pips"] = (res["ask_c"] - res["bid_c"]) / pip_size
+    # Ensure spread stats are sane
+    res["spread_o_pips"] = res["spread_o_pips"].fillna((res["ask_o"] - res["bid_o"]) / pip_size)
+    res["spread_c_pips"] = res["spread_c_pips"].fillna((res["ask_c"] - res["bid_c"]) / pip_size)
+    res["spread_mean_pips"] = res["spread_mean_pips"].fillna(res["spread_c_pips"])
+    res["spread_min_pips"] = res["spread_min_pips"].fillna(res["spread_c_pips"])
+    res["spread_max_pips"] = res["spread_max_pips"].fillna(res["spread_c_pips"])
 
     return res
 
@@ -103,11 +103,29 @@ def build_candles(df_ticks: pd.DataFrame,
 def store_table(conn: sqlite3.Connection, table: str, df: pd.DataFrame):
     if df.empty:
         return
+    ensure_columns(conn, table, df)
     df.to_sql(table, conn, if_exists="append", index=False)
 
 
 def truncate_table(conn: sqlite3.Connection, table: str):
     conn.execute(f"DELETE FROM {table}")
+
+
+def ensure_columns(conn: sqlite3.Connection, table: str, df: pd.DataFrame):
+    cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+    row = cur.fetchone()
+    if row is None:
+        return
+    existing = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    existing_set = set(existing)
+    for col in df.columns:
+        if col in existing_set:
+            continue
+        if pd.api.types.is_numeric_dtype(df[col]):
+            col_type = "REAL"
+        else:
+            col_type = "TEXT"
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
 
 
 def build_backtest_tables(db_path: str = None,
