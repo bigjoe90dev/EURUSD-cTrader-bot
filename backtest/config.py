@@ -29,6 +29,10 @@ class BacktestSettings:
     price_min: float = 0.5                     # hard sanity bound
     price_max: float = 2.5                     # hard sanity bound
 
+    # Risk controls (0 = disabled)
+    max_daily_loss_pct: float = 0.0
+    max_trades_per_day: int = 0
+
 
 def load_backtest_settings() -> BacktestSettings:
     return BacktestSettings(
@@ -43,4 +47,6 @@ def load_backtest_settings() -> BacktestSettings:
         min_spread_pips_abs=float(_get_env("BACKTEST_MIN_SPREAD_PIPS", "0.01")),
         price_min=float(_get_env("BACKTEST_PRICE_MIN", "0.5")),
         price_max=float(_get_env("BACKTEST_PRICE_MAX", "2.5")),
+        max_daily_loss_pct=float(_get_env("BACKTEST_MAX_DAILY_LOSS_PCT", "0.0")),
+        max_trades_per_day=int(_get_env("BACKTEST_MAX_TRADES_PER_DAY", "0")),
     )

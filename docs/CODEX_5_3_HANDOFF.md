@@ -87,7 +87,9 @@ Files:
    - Spread stats stored per bar (min/mean/max) for more realistic fills
 8. **ATR now computed without current bar contamination** (reduces lookahead bias)
 9. **Backtest signal timing default set to `open`**
-10. **Verified data exists**:
+10. **Added backtest risk caps (optional)**:
+   - `BACKTEST_MAX_DAILY_LOSS_PCT` and `BACKTEST_MAX_TRADES_PER_DAY`
+11. **Verified data exists**:
    - `quotes` ~375k rows
    - Candle tables now built successfully
 9. **Ran fast backtests** and wrote results to:
@@ -134,7 +136,7 @@ DeepSeek includes some generic snippets; verify any claims against repo before c
    - Re‑optimize buffer, ATR bounds, body ratio, and exit timing
 2. **Run full robustness backtests**
    - Walk‑forward, Monte Carlo, regime analysis
-3. **Add stronger risk controls** in backtests
+3. **Decide on risk controls** for production
    - Daily loss cap, max trades/day, and lot sizing via `backtest/position_sizer.py`
 4. Decide:
    - If London Open Breakout survives robust tests → proceed to paper trading

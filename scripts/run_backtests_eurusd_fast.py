@@ -102,6 +102,8 @@ def main():
                 signal_timing=bt_cfg.signal_timing,
                 spread_model=bt_cfg.spread_model,
                 slippage_model=bt_cfg.slippage_model,
+                max_daily_loss_pct=bt_cfg.max_daily_loss_pct,
+                max_trades_per_day=bt_cfg.max_trades_per_day,
             )
             pause_mask = build_news_pause_mask(df["ts_utc"])
             result = engine.run(df, pause_mask=pause_mask)

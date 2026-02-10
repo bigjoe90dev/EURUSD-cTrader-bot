@@ -153,7 +153,9 @@ class BacktestEngine:
                  atr_lookback: int = 14,
                  signal_timing: str = "open",
                  spread_model: str = "empirical",
-                 slippage_model: str = "session_volatility"):
+                 slippage_model: str = "session_volatility",
+                 max_daily_loss_pct: float = 0.0,
+                 max_trades_per_day: int = 0):
         self.strategy = strategy
         self.cfg = cost_config or CostConfig()
         self.initial_balance = initial_balance
@@ -163,6 +165,8 @@ class BacktestEngine:
         self.signal_timing = signal_timing
         self.spread_model = spread_model
         self.slippage_model = slippage_model
+        self.max_daily_loss_pct = max_daily_loss_pct
+        self.max_trades_per_day = max_trades_per_day
 
     def run(self, df: pd.DataFrame, pause_mask=None) -> BacktestResult:
         """
@@ -195,6 +199,10 @@ class BacktestEngine:
         pending_signal = None
         prev_bar = None
         prev_ctx = None
+        trades_today = 0
+        day_start_balance = self.initial_balance
+        day_halt = False
+        current_day = None
 
         if pause_mask is not None:
             pause_mask = pd.Series(pause_mask).reset_index(drop=True)
@@ -202,19 +210,51 @@ class BacktestEngine:
         for i in range(n):
             row = data.iloc[i]
             bar = self._row_to_bar(row)
+            bar_day = bar.ts.date()
+            if current_day is None or bar_day != current_day:
+                current_day = bar_day
+                day_start_balance = balance
+                trades_today = 0
+                day_halt = False
             atr_pips = self._estimate_atr_pips(recent_mids)
             spread_for_ctx = bar.spread_max_pips if bar.spread_max_pips > 0 else bar.spread_c_pips
             ctx = Context(atr_pips=atr_pips, session=bar.session,
                           spread_pips=spread_for_ctx, bar_index=i)
+
+            # Daily loss guard (equity-based)
+            if self.max_daily_loss_pct > 0.0:
+                if position is not None:
+                    mtm = self._mark_to_market(position, bar, ctx)
+                    equity_now = balance + mtm
+                else:
+                    equity_now = balance
+                if not day_halt:
+                    loss_pct = max(0.0, day_start_balance - equity_now) / max(day_start_balance, 1e-9)
+                    if loss_pct >= self.max_daily_loss_pct:
+                        day_halt = True
+                        if position is not None:
+                            position, balance = self._apply_signal(
+                                Signal.CLOSE, position, balance, bar, ctx, price_point="close", trades=trades, totals=total_costs
+                            )
 
             # Execute any pending signal at open (close_plus_1bar)
             if self.signal_timing == "close_plus_1bar" and pending_signal:
                 sig = pending_signal
                 if pause_mask is not None and bool(pause_mask.iloc[i]) and sig in (Signal.BUY, Signal.SELL):
                     sig = Signal.FLAT
+                if day_halt and sig in (Signal.BUY, Signal.SELL):
+                    sig = Signal.FLAT
+                if self.max_trades_per_day and trades_today >= self.max_trades_per_day and sig in (Signal.BUY, Signal.SELL):
+                    sig = Signal.CLOSE if position is not None else Signal.FLAT
+                pre_pos = position
                 position, balance = self._apply_signal(
                     sig, position, balance, bar, ctx, price_point="open", trades=trades, totals=total_costs
                 )
+                if sig in (Signal.BUY, Signal.SELL):
+                    if pre_pos is None and position is not None:
+                        trades_today += 1
+                    elif pre_pos is not None and position is not None and pre_pos.entry_ts != position.entry_ts:
+                        trades_today += 1
                 pending_signal = None
 
             # "open" timing: evaluate previous bar, execute at current open
@@ -222,19 +262,39 @@ class BacktestEngine:
                 signal = self.strategy.on_bar(prev_bar, prev_ctx)
                 if pause_mask is not None and bool(pause_mask.iloc[i]) and signal in (Signal.BUY, Signal.SELL):
                     signal = Signal.FLAT
+                if day_halt and signal in (Signal.BUY, Signal.SELL):
+                    signal = Signal.FLAT
+                if self.max_trades_per_day and trades_today >= self.max_trades_per_day and signal in (Signal.BUY, Signal.SELL):
+                    signal = Signal.CLOSE if position is not None else Signal.FLAT
+                pre_pos = position
                 position, balance = self._apply_signal(
                     signal, position, balance, bar, ctx, price_point="open", trades=trades, totals=total_costs
                 )
+                if signal in (Signal.BUY, Signal.SELL):
+                    if pre_pos is None and position is not None:
+                        trades_today += 1
+                    elif pre_pos is not None and position is not None and pre_pos.entry_ts != position.entry_ts:
+                        trades_today += 1
 
             # "close" and "close_plus_1bar" timing: evaluate current bar
             if self.signal_timing in ("close", "close_plus_1bar"):
                 signal = self.strategy.on_bar(bar, ctx)
                 if pause_mask is not None and bool(pause_mask.iloc[i]) and signal in (Signal.BUY, Signal.SELL):
                     signal = Signal.FLAT
+                if day_halt and signal in (Signal.BUY, Signal.SELL):
+                    signal = Signal.FLAT
+                if self.max_trades_per_day and trades_today >= self.max_trades_per_day and signal in (Signal.BUY, Signal.SELL):
+                    signal = Signal.CLOSE if position is not None else Signal.FLAT
                 if self.signal_timing == "close":
+                    pre_pos = position
                     position, balance = self._apply_signal(
                         signal, position, balance, bar, ctx, price_point="close", trades=trades, totals=total_costs
                     )
+                    if signal in (Signal.BUY, Signal.SELL):
+                        if pre_pos is None and position is not None:
+                            trades_today += 1
+                        elif pre_pos is not None and position is not None and pre_pos.entry_ts != position.entry_ts:
+                            trades_today += 1
                 else:
                     pending_signal = signal
 
