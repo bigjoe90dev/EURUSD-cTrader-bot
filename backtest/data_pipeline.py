@@ -39,26 +39,22 @@ def clean_ticks(df: pd.DataFrame,
     spread = out["ask"] - out["bid"]
     out = out[spread > 0].reset_index(drop=True)
 
+    # Recompute mid
+    out["mid"] = (out["bid"] + out["ask"]) / 2.0
+
+    # Hard sanity filter for impossible prices (drop corrupted ticks)
+    out = out[(out["mid"] >= cfg.price_min) & (out["mid"] <= cfg.price_max)].reset_index(drop=True)
+
     # Add spread in pips
     out["spread_pips"] = (out["ask"] - out["bid"]) / pip_size
+
+    # Drop only extreme/broken spreads (keep real spikes)
+    out = out[(out["spread_pips"] >= cfg.min_spread_pips_abs) &
+              (out["spread_pips"] <= cfg.max_spread_pips_abs)].reset_index(drop=True)
 
     # Session tagging
     rules = parse_session_rules(cfg.session_rules)
     out["session"] = out["ts_utc"].apply(lambda ts: classify_session(ts.to_pydatetime(), rules))
-
-    # Remove extreme spreads per session
-    filtered = []
-    for session, g in out.groupby("session", dropna=False):
-        if g.empty:
-            continue
-        med = g["spread_pips"].median()
-        cap = max(cfg.min_spread_pips_abs, min(cfg.max_spread_pips_abs, med * cfg.spread_outlier_mult))
-        g = g[g["spread_pips"] <= cap]
-        filtered.append(g)
-    out = pd.concat(filtered, ignore_index=True) if filtered else out.iloc[0:0].copy()
-
-    # Recompute mid
-    out["mid"] = (out["bid"] + out["ask"]) / 2.0
     return out
 
 

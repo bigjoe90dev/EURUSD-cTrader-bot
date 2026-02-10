@@ -20,12 +20,14 @@ class BacktestSettings:
     session_rules: str = ""                    # optional rules string
     spread_model: str = "empirical"            # empirical | fixed | hybrid
     slippage_model: str = "session_volatility" # session_volatility | fixed
-    signal_timing: str = "close_plus_1bar"     # close | open | close_plus_1bar
+    signal_timing: str = "open"                # close | open | close_plus_1bar
 
     # Cleaning / QC thresholds
     spread_outlier_mult: float = 10.0          # drop ticks > median*mult per session
     max_spread_pips_abs: float = 20.0          # absolute spread cap
     min_spread_pips_abs: float = 0.01          # absolute min spread
+    price_min: float = 0.5                     # hard sanity bound
+    price_max: float = 2.5                     # hard sanity bound
 
 
 def load_backtest_settings() -> BacktestSettings:
@@ -39,4 +41,6 @@ def load_backtest_settings() -> BacktestSettings:
         spread_outlier_mult=float(_get_env("BACKTEST_SPREAD_OUTLIER_MULT", "10.0")),
         max_spread_pips_abs=float(_get_env("BACKTEST_MAX_SPREAD_PIPS", "20.0")),
         min_spread_pips_abs=float(_get_env("BACKTEST_MIN_SPREAD_PIPS", "0.01")),
+        price_min=float(_get_env("BACKTEST_PRICE_MIN", "0.5")),
+        price_max=float(_get_env("BACKTEST_PRICE_MAX", "2.5")),
     )

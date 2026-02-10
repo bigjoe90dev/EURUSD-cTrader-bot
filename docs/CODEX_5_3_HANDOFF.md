@@ -12,6 +12,8 @@ We collect EURUSD ticks from cTrader into SQLite, build cleaned candle tables, a
 Right now all strategies are losing **except** London Open Breakout, which is now slightly profitable after filters were added.  
 Next step is to **tune London Open Breakout** and then run the **full robust backtest suite** (walk‑forward, Monte Carlo, regimes).
 
+**Important constraint:** We are **not doing HFT**. This system is built for **free infrastructure**, so all logic must survive higher spreads, slippage, and slower execution.
+
 ---
 
 ## 2) Codebase Overview (What Each Part Does)
@@ -27,6 +29,7 @@ Next step is to **tune London Open Breakout** and then run the **full robust bac
   - Tags sessions (Asia/Frankfurt/London/NY)
   - Builds candle tables: `candles_m1`, `candles_m5`, `candles_m15`, `candles_h1`
 - `backtest/session.py` — DST‑aware session classification
+- `backtest/news_pause.py` — builds a news pause mask for backtests
 
 ### Backtest Engine
 - `backtest/engine.py`
@@ -34,6 +37,7 @@ Next step is to **tune London Open Breakout** and then run the **full robust bac
   - Bid/ask fills
   - Session‑based spread/slippage
   - Signal timing modes: `close`, `open`, `close_plus_1bar`
+  - News pause support (blocks new entries during events)
 
 ### Strategies (EURUSD)
 File: `backtest/eurusd_strategies.py`
@@ -73,10 +77,15 @@ Files:
    - ATR range filter
    - Candle body confirmation
    - One trade per day
-5. **Verified data exists**:
+5. **Added news pause support in backtests**
+6. **Adjusted data cleaning**:
+   - Drop impossible price ticks
+   - Keep real spread spikes (only drop extreme/broken spreads)
+7. **Backtest signal timing default set to `open`**
+8. **Verified data exists**:
    - `quotes` ~375k rows
    - Candle tables now built successfully
-6. **Ran fast backtests** and wrote results to:
+9. **Ran fast backtests** and wrote results to:
    - `/tmp/eurusd_fast_backtests.csv`
 
 ---
@@ -108,6 +117,9 @@ File: `/tmp/eurusd_fast_backtests.csv`
 
 **Main confusion:** backtests were “not working” because candle tables were empty.  
 This is now fixed. Backtests run and produce output.
+
+**LLM review status:** Only Grok review text was present in `LLM_reviews/v1/grok/review 1` at last check.  
+Other review files were empty.
 
 ---
 

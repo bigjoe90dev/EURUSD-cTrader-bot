@@ -164,7 +164,7 @@ class BacktestEngine:
         self.spread_model = spread_model
         self.slippage_model = slippage_model
 
-    def run(self, df: pd.DataFrame) -> BacktestResult:
+    def run(self, df: pd.DataFrame, pause_mask=None) -> BacktestResult:
         """
         Run a backtest on a DataFrame of candles.
 
@@ -196,6 +196,9 @@ class BacktestEngine:
         prev_bar = None
         prev_ctx = None
 
+        if pause_mask is not None:
+            pause_mask = pd.Series(pause_mask).reset_index(drop=True)
+
         for i in range(n):
             row = data.iloc[i]
             bar = self._row_to_bar(row)
@@ -206,14 +209,19 @@ class BacktestEngine:
 
             # Execute any pending signal at open (close_plus_1bar)
             if self.signal_timing == "close_plus_1bar" and pending_signal:
+                sig = pending_signal
+                if pause_mask is not None and bool(pause_mask.iloc[i]) and sig in (Signal.BUY, Signal.SELL):
+                    sig = Signal.FLAT
                 position, balance = self._apply_signal(
-                    pending_signal, position, balance, bar, ctx, price_point="open", trades=trades, totals=total_costs
+                    sig, position, balance, bar, ctx, price_point="open", trades=trades, totals=total_costs
                 )
                 pending_signal = None
 
             # "open" timing: evaluate previous bar, execute at current open
             if self.signal_timing == "open" and prev_bar is not None and prev_ctx is not None:
                 signal = self.strategy.on_bar(prev_bar, prev_ctx)
+                if pause_mask is not None and bool(pause_mask.iloc[i]) and signal in (Signal.BUY, Signal.SELL):
+                    signal = Signal.FLAT
                 position, balance = self._apply_signal(
                     signal, position, balance, bar, ctx, price_point="open", trades=trades, totals=total_costs
                 )
@@ -221,6 +229,8 @@ class BacktestEngine:
             # "close" and "close_plus_1bar" timing: evaluate current bar
             if self.signal_timing in ("close", "close_plus_1bar"):
                 signal = self.strategy.on_bar(bar, ctx)
+                if pause_mask is not None and bool(pause_mask.iloc[i]) and signal in (Signal.BUY, Signal.SELL):
+                    signal = Signal.FLAT
                 if self.signal_timing == "close":
                     position, balance = self._apply_signal(
                         signal, position, balance, bar, ctx, price_point="close", trades=trades, totals=total_costs

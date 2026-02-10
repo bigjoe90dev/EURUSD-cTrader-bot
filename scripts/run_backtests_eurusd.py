@@ -14,6 +14,7 @@ from backtest.regime import label_regimes, regime_performance
 from backtest.strategy_registry import param_grid, param_sampler, strategy_factory
 from scripts import init_db
 from shared.config import load_settings
+from backtest.news_pause import build_news_pause_mask
 from backtest.eurusd_strategies import (
     LondonOpenBreakoutStrategy,
     AsianRangeFadeStrategy,
@@ -100,7 +101,8 @@ def main():
             spread_model=bt_cfg.spread_model,
             slippage_model=bt_cfg.slippage_model,
         )
-        result = engine.run(df)
+        pause_mask = build_news_pause_mask(df["ts_utc"])
+        result = engine.run(df, pause_mask=pause_mask)
 
         # Robustness / validation layers
         factory = strategy_factory(strat.name())

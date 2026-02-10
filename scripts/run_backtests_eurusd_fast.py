@@ -15,6 +15,7 @@ from backtest.config import load_backtest_settings
 from backtest.data_pipeline import build_backtest_tables
 from backtest.engine import BacktestEngine
 from backtest.costs import CostConfig
+from backtest.news_pause import build_news_pause_mask
 from shared.config import load_settings
 from backtest.eurusd_strategies import (
     LondonOpenBreakoutStrategy,
@@ -102,7 +103,8 @@ def main():
                 spread_model=bt_cfg.spread_model,
                 slippage_model=bt_cfg.slippage_model,
             )
-            result = engine.run(df)
+            pause_mask = build_news_pause_mask(df["ts_utc"])
+            result = engine.run(df, pause_mask=pause_mask)
             m = result.metrics
             writer.writerow([
                 strat.name(), tf_table,
