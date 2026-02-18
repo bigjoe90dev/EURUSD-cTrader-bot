@@ -1,0 +1,50 @@
+eurusd:
+  source: local_sqlite
+  symbol: EURUSD
+  timeframe: 1m
+  sqlite_db_path: research/data_cache/eurusd/raw/ict_bot.sqlite3
+  # Use full available DB range unless explicitly bounded.
+  start_ts_utc: null
+  end_ts_utc: null
+  required_start_ts_utc: "2019-01-01T00:00:00Z"
+  raw_dir: research/data_cache/eurusd/raw
+  normalized_dir: research/data_cache/eurusd/normalized
+  ticks_path: research/data_cache/eurusd/normalized/eurusd_ticks.parquet
+  canonical_1m_path: research/data_cache/eurusd/normalized/eurusd_ohlc_1m.parquet
+  files_root: research/data_cache/eurusd
+
+btcusdt:
+  source: binance
+  symbol: BTCUSDT
+  timeframe: 1m
+  start_month: "2019-01"
+  end_month: "auto_latest_full_month"
+  start_ts_utc: "2019-01-01T00:00:00Z"
+  end_ts_utc: null
+  required_start_ts_utc: "2019-01-01T00:00:00Z"
+  raw_zip_dir: research/data_cache/btcusdt/binance/raw_zips
+  download_index_path: research/data_cache/btcusdt/binance/raw_zips/download_index.json
+  canonical_1m_path: research/data_cache/btcusdt/binance/normalized/btcusdt_1m.parquet
+  files_root: research/data_cache/btcusdt/binance
+
+xauusd:
+  source: dukascopy
+  symbol: XAUUSD
+  timeframe: 1m
+  start_ts_utc: "2019-01-01T00:00:00Z"
+  end_ts_utc: "2025-12-31T23:59:59Z"
+  required_start_ts_utc: "2019-01-01T00:00:00Z"
+  required_end_ts_utc: "2025-12-31T23:59:00Z"
+  # Dukascopy XAUUSD integer price scale in BID/ASK 1m candles.
+  price_scale: 1000
+  request_timeout_sec: 45
+  single_side_mode: fail
+  raw_dir: research/data_cache/xauusd/dukascopy/raw
+  download_index_path: research/data_cache/xauusd/dukascopy/raw/download_index.json
+  normalized_dir: research/data_cache/xauusd/dukascopy/normalized
+  quotes_path: research/data_cache/xauusd/dukascopy/normalized/xauusd_quotes_1m.parquet
+  canonical_1m_path: research/data_cache/xauusd/dukascopy/normalized/xauusd_1m.parquet
+  files_root: research/data_cache/xauusd/dukascopy
+
+manifest:
+  path: research/data_manifest.yml

@@ -1,20 +1,5 @@
-# Core
-python-dotenv==1.0.1
-requests==2.32.3
-
-# Dashboard
-dash==2.17.1
-
-# Data / Analysis
-pandas==2.0.3
-numpy>=1.24,<2.0
-
-# Statistics (Monte Carlo, bootstrap, distributions)
-scipy>=1.10,<2.0
-
-# cTrader Open API (Protobuf over TCP)
-ctrader-open-api
-twisted
-
-# Backtest visualization (already pulled in by dash, pinned for clarity)
-plotly>=5.18
+pandas
+numpy
+pyarrow
+requests
+pyyaml

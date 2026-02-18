@@ -1,19 +1,11 @@
-# secrets
-.env*
-!.env.example
-
-# python
+.env
 .venv/
+research/data_cache/
+research/artefacts/logs/
+*.parquet
+*.db
+*.sqlite
+*.sqlite3
 __pycache__/
 *.pyc
-
-# local state/data
-data/
-*.sqlite
-*.sqlite*
-logs/
 .DS_Store
-
-# large/research artifacts
-RESEARCH ME/
-LLM_reviews/
